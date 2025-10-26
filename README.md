@@ -12,6 +12,7 @@ A mobile-optimized web app for tracking daily calorie intake with deficit goals 
 - **BMR Calculator**: Personalized daily calorie goals based on your profile
 - **Mobile-First Design**: Optimized for mobile devices with touch-friendly UI
 - **Offline-Capable**: All data stored locally in your browser
+- **Robust Backup & Restore**: Enhanced error handling for reliable data imports
 
 ## User Profile (Default Settings)
 
@@ -49,6 +50,40 @@ A mobile-optimized web app for tracking daily calorie intake with deficit goals 
 3. Daily goal is set to BMR - 500 calories
 4. Add exercise calories to account for daily activity
 
+### Backup & Restore
+
+The app includes comprehensive backup and restore functionality with robust error handling:
+
+#### Creating a Backup
+1. Go to Settings tab
+2. Choose from three backup options:
+   - **Share to Notes** (iOS/Android) - Native share sheet integration
+   - **Copy Backup** - Copy JSON to clipboard
+   - **Download File** - Save as .json file
+
+#### Restoring from Backup
+1. Use "Import Backup" (file upload) or "Paste Backup" (from clipboard)
+2. The app validates the backup with multi-step error checking
+3. Confirms before overwriting existing data
+4. Restores all data including history, quick-add items, and settings
+
+#### Enhanced Error Handling
+
+The backup restore feature includes robust JSON parsing with detailed error messages:
+
+- **Whitespace Trimming**: Automatically removes leading/trailing whitespace
+- **JSON Validation**: Verifies the backup data is valid JSON format
+- **Structure Validation**: Ensures required data fields are present
+- **Data Validation**: Checks that backup contains recognizable data
+- **User-Friendly Errors**: Clear, specific feedback when restoration fails
+
+Common error messages you might see:
+- "Backup data is empty. Please paste valid backup data."
+- "Failed to paste backup. Make sure you copied valid backup data. Error: JSON Parse error: Unable to parse JSON string"
+- "Invalid backup format. No recognizable data found in backup."
+
+This prevents data loss from malformed backups and guides users to fix issues.
+
 ## Technology Stack
 
 - **HTML5**: Semantic markup, mobile viewport
@@ -56,6 +91,7 @@ A mobile-optimized web app for tracking daily calorie intake with deficit goals 
 - **JavaScript**: Vanilla ES6+, no frameworks
 - **Chart.js**: Data visualization
 - **localStorage**: Client-side data persistence
+- **PWA**: Service Worker for offline functionality
 
 ## Deployment
 
@@ -77,7 +113,9 @@ This app is configured to deploy automatically from the `claude` branch via GitH
 /
 ├── index.html              # Main app page
 ├── styles.css              # All styles
-├── app.js                  # Main app logic
+├── app.js                  # Main app logic with robust error handling
+├── manifest.json           # PWA manifest
+├── service-worker.js       # Service worker for offline support
 ├── IMPLEMENTATION_PLAN.md  # Detailed implementation guide
 └── README.md               # This file
 ```
@@ -113,6 +151,15 @@ Uses the Mifflin-St Jeor equation:
 - Firefox (latest)
 - Mobile browsers (iOS Safari, Chrome Mobile)
 
+## Recent Improvements
+
+### Enhanced Backup JSON Parsing (Latest)
+- Added comprehensive parseBackupData method with multi-step validation
+- Implemented whitespace trimming for pasted backup data
+- Added specific error messages for different failure scenarios
+- Improved both clipboard paste and file import error handling
+- Fixed "JSON Parse error: Unable to parse JSON string" issues
+
 ## Future Enhancements
 
 - [ ] Meal categories (breakfast, lunch, dinner, snacks)
@@ -120,7 +167,7 @@ Uses the Mifflin-St Jeor equation:
 - [ ] Photo uploads for meals
 - [ ] Barcode scanner integration
 - [ ] Export data to CSV
-- [ ] PWA with offline support
+- [x] PWA with offline support
 - [ ] Dark mode theme
 - [ ] Weight tracking over time
 

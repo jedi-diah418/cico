@@ -730,12 +730,67 @@ class CalorieTracker {
     async pasteDataFromClipboard() {
         try {
             const text = await navigator.clipboard.readText();
-            const data = JSON.parse(text);
-            this.importData(data);
+
+            // Use robust parsing with detailed error messages
+            const result = this.parseBackupData(text);
+
+            if (!result.success) {
+                alert(result.error);
+                return;
+            }
+
+            this.importData(result.data);
         } catch (err) {
             alert('Failed to paste backup. Make sure you copied valid backup data.\n\nError: ' + err.message);
             console.error('Paste failed:', err);
         }
+    }
+
+    parseBackupData(input) {
+        // Step 1: Validate input is not empty
+        if (!input || input.trim() === '') {
+            return {
+                success: false,
+                error: 'Backup data is empty. Please paste valid backup data.'
+            };
+        }
+
+        // Step 2: Clean the input (trim whitespace)
+        const cleanedInput = input.trim();
+
+        // Step 3: Try to parse JSON
+        let parsed;
+        try {
+            parsed = JSON.parse(cleanedInput);
+        } catch (parseError) {
+            return {
+                success: false,
+                error: 'Failed to paste backup. Make sure you copied valid backup data.\n\nError: JSON Parse error: Unable to parse JSON string'
+            };
+        }
+
+        // Step 4: Validate backup structure
+        if (!parsed || typeof parsed !== 'object') {
+            return {
+                success: false,
+                error: 'Invalid backup format. Backup must be a valid JSON object.'
+            };
+        }
+
+        // Step 5: Validate that it has at least some data fields
+        const hasData = parsed.userProfile || parsed.quickAddItems || parsed.dailyHistory || parsed.todayEntries;
+        if (!hasData) {
+            return {
+                success: false,
+                error: 'Invalid backup format. No recognizable data found in backup.'
+            };
+        }
+
+        // Step 6: Return validated data
+        return {
+            success: true,
+            data: parsed
+        };
     }
 
     importData(data) {
@@ -798,13 +853,15 @@ class CalorieTracker {
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                this.importData(data);
-            } catch (err) {
-                alert('Failed to read backup file. Please check the file format.');
-                console.error('File read failed:', err);
+            // Use robust parsing with detailed error messages
+            const result = this.parseBackupData(e.target.result);
+
+            if (!result.success) {
+                alert(result.error);
+                return;
             }
+
+            this.importData(result.data);
         };
         reader.readAsText(file);
 
