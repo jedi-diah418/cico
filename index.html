@@ -2,68 +2,291 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Simple calorie tracker for weight loss with deficit tracking">
+    <meta name="theme-color" content="#4CAF50">
+
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Calorie Tracker">
+
     <title>Calorie Tracker</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%234CAF50' width='192' height='192' rx='32'/%3E%3Ctext x='96' y='140' font-size='120' text-anchor='middle' fill='white'%3E🍎%3C/text%3E%3C/svg%3E">
+
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Calorie Tracker</h1>
-
-        <div class="stats">
-            <div class="stat-card">
-                <h3>Today's Total</h3>
-                <p id="total-calories">0</p>
-                <span>calories</span>
-            </div>
-            <div class="stat-card">
-                <h3>Daily Goal</h3>
-                <p id="daily-goal">2000</p>
-                <span>calories</span>
-            </div>
-            <div class="stat-card">
-                <h3>Remaining</h3>
-                <p id="remaining-calories">2000</p>
-                <span>calories</span>
-            </div>
+    <!-- Header -->
+    <header class="header">
+        <h1 class="app-title">Calorie Tracker</h1>
+        <div class="header-info">
+            <span class="current-date" id="currentDate"></span>
+            <span class="offline-indicator" id="offlineIndicator" style="display: none;">📴 Offline</span>
         </div>
+    </header>
 
-        <div class="add-food">
-            <h2>Add Food</h2>
-            <form id="food-form">
-                <input type="text" id="food-name" placeholder="Food name" required>
-                <input type="number" id="food-calories" placeholder="Calories" required min="0">
-                <button type="submit">Add</button>
-            </form>
-        </div>
-
-        <div class="food-list">
-            <h2>Today's Foods</h2>
-            <ul id="foods"></ul>
-        </div>
-
-        <div class="backup-section">
-            <h2>Backup & Restore</h2>
-            <div class="backup-buttons">
-                <button id="copy-backup" class="btn-primary">Copy Backup</button>
-                <button id="paste-backup" class="btn-secondary">Paste Backup</button>
+    <!-- Install Prompt (shown when app can be installed) -->
+    <div class="install-prompt" id="installPrompt" style="display: none;">
+        <div class="install-content">
+            <span>📱 Install app for offline use?</span>
+            <div class="install-buttons">
+                <button class="btn btn-small btn-primary" id="installBtn">Install</button>
+                <button class="btn btn-small" id="dismissInstallBtn">Later</button>
             </div>
-            <div id="backup-status" class="status-message"></div>
         </div>
     </div>
 
-    <div id="paste-modal" class="modal">
-        <div class="modal-content">
-            <h2>Paste Backup Data</h2>
-            <textarea id="backup-input" placeholder="Paste your backup data here..."></textarea>
-            <div class="modal-buttons">
-                <button id="restore-btn" class="btn-primary">Restore</button>
-                <button id="cancel-btn" class="btn-secondary">Cancel</button>
-            </div>
-            <div id="paste-error" class="error-message"></div>
-        </div>
-    </div>
+    <!-- Main Container -->
+    <main class="container">
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="today">Today</button>
+            <button class="tab" data-tab="history">History</button>
+            <button class="tab" data-tab="quick-add">Quick Add</button>
+            <button class="tab" data-tab="settings">Settings</button>
+        </nav>
 
+        <!-- Today Tab -->
+        <div id="today" class="tab-content active">
+            <!-- Quick Stats Card -->
+            <div class="stats-card">
+                <div class="stat-item">
+                    <span class="stat-label">Goal</span>
+                    <span class="stat-value" id="dailyGoal">1400</span>
+                    <span class="stat-unit">cal</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Consumed</span>
+                    <span class="stat-value" id="consumedCalories">0</span>
+                    <span class="stat-unit">cal</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Remaining</span>
+                    <span class="stat-value" id="remainingCalories">1400</span>
+                    <span class="stat-unit">cal</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <p class="progress-text" id="progressText">0% of daily goal</p>
+
+            <!-- Quick Add Buttons -->
+            <div class="section">
+                <h2>Quick Add</h2>
+                <div class="quick-add-grid" id="quickAddGrid">
+                    <p class="empty-message">No quick-add items yet. Add some in the Quick Add tab!</p>
+                </div>
+            </div>
+
+            <!-- Manual Entry Form -->
+            <div class="section">
+                <h2>Add Food</h2>
+                <form class="add-form" id="addFoodForm">
+                    <input
+                        type="text"
+                        id="foodName"
+                        placeholder="Food name"
+                        required
+                        autocomplete="off"
+                    >
+                    <input
+                        type="number"
+                        id="foodCalories"
+                        placeholder="Calories"
+                        required
+                        min="1"
+                        step="1"
+                    >
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </form>
+            </div>
+
+            <!-- Today's Log -->
+            <div class="section">
+                <h2>Today's Log</h2>
+                <div class="food-log" id="foodLog">
+                    <p class="empty-message">No items added yet today.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content">
+            <div class="section">
+                <h2>Calorie Trend</h2>
+                <div class="chart-controls">
+                    <button class="btn btn-small" data-period="7">7 Days</button>
+                    <button class="btn btn-small active" data-period="30">30 Days</button>
+                    <button class="btn btn-small" data-period="all">All Time</button>
+                </div>
+                <canvas id="trendChart"></canvas>
+                <div class="chart-stats">
+                    <div class="chart-stat">
+                        <span class="label">Average:</span>
+                        <span class="value" id="avgCalories">-</span>
+                    </div>
+                    <div class="chart-stat">
+                        <span class="label">Days tracked:</span>
+                        <span class="value" id="daysTracked">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Daily History</h2>
+                <div class="history-list" id="historyList">
+                    <p class="empty-message">No history yet. Start tracking today!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Add Management Tab -->
+        <div id="quick-add" class="tab-content">
+            <div class="section">
+                <h2>Manage Quick-Add Items</h2>
+                <p class="description">Save frequently eaten items for one-tap adding</p>
+
+                <form class="add-form" id="saveQuickAddForm">
+                    <input
+                        type="text"
+                        id="quickAddName"
+                        placeholder="Item name"
+                        required
+                        autocomplete="off"
+                    >
+                    <input
+                        type="number"
+                        id="quickAddCalories"
+                        placeholder="Calories"
+                        required
+                        min="1"
+                        step="1"
+                    >
+                    <button type="submit" class="btn btn-primary">Save Item</button>
+                </form>
+
+                <div class="quick-add-list" id="quickAddList">
+                    <p class="empty-message">No saved items yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="section">
+                <h2>Profile Settings</h2>
+                <form class="settings-form" id="settingsForm">
+                    <div class="form-group">
+                        <label for="weight">Weight (lbs)</label>
+                        <input type="number" id="weight" value="200" min="50" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label for="height">Height (inches)</label>
+                        <input type="number" id="height" value="70" min="48" max="96">
+                    </div>
+                    <div class="form-group">
+                        <label for="age">Age (optional)</label>
+                        <input type="number" id="age" placeholder="30" min="10" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label for="gender">Gender</label>
+                        <select id="gender">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="exerciseCalories">Daily Exercise Burn (optional)</label>
+                        <input type="number" id="exerciseCalories" value="75" min="0" max="2000">
+                        <small>Estimated: 50-100 cal for your kettlebell routine</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+
+                <div class="bmr-info">
+                    <h3>Your Metabolism</h3>
+                    <div class="info-item">
+                        <span class="label">BMR (Base Metabolic Rate):</span>
+                        <span class="value" id="bmrValue">1850</span>
+                        <span class="unit">cal/day</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Daily Goal (500 cal deficit):</span>
+                        <span class="value" id="goalValue">1350</span>
+                        <span class="unit">cal/day</span>
+                    </div>
+                    <p class="info-text">
+                        A 500 calorie daily deficit should result in ~1 lb weight loss per week.
+                    </p>
+                </div>
+
+                <div class="section">
+                    <h3>App Status</h3>
+                    <div class="app-status">
+                        <div class="status-item">
+                            <span class="label">Mode:</span>
+                            <span class="value" id="appMode">Loading...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Version:</span>
+                            <span class="value" id="appVersion">1.0.0</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Status:</span>
+                            <span class="value" id="updateStatus">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="checkUpdateBtn">🔄 Check for Updates</button>
+                        <button class="btn btn-secondary" id="installAppBtn" style="display: none;">📱 Install App</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>Data Management</h3>
+                    <p class="description">Backup your data before updates or switching devices</p>
+
+                    <div class="backup-buttons">
+                        <button class="btn btn-primary" id="shareDataBtn" style="display: none;">
+                            📱 Share to Notes
+                        </button>
+                        <button class="btn btn-secondary" id="copyDataBtn">Copy Backup</button>
+                        <button class="btn btn-secondary" id="exportDataBtn">Download File</button>
+                    </div>
+
+                    <div class="import-section">
+                        <label for="importFile" class="btn btn-primary" style="margin-top: 1rem;">
+                            Import Backup
+                            <input type="file" id="importFile" accept=".json" style="display: none;">
+                        </label>
+                        <button class="btn btn-primary" id="pasteDataBtn" style="margin-top: 1rem;">Paste Backup</button>
+                    </div>
+
+                    <button class="btn btn-danger" id="clearDataBtn" style="margin-top: 1rem;">Clear All Data</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2025 Calorie Tracker | Stay consistent, reach your goals!</p>
+    </footer>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Main App Script -->
     <script src="app.js"></script>
 </body>
 </html>

@@ -1,216 +1,748 @@
-// Calorie Tracker Application
+// Calorie Tracker App - Main JavaScript
+
+// ============================================================================
+// DATA STORAGE & STATE MANAGEMENT
+// ============================================================================
 
 class CalorieTracker {
     constructor() {
-        this.foods = [];
-        this.dailyGoal = 2000;
-        this.loadFromLocalStorage();
-        this.initEventListeners();
-        this.render();
+        this.currentDate = this.getTodayDate();
+        this.userProfile = this.loadUserProfile();
+        this.quickAddItems = this.loadQuickAddItems();
+        this.dailyHistory = this.loadDailyHistory();
+        this.todayEntries = this.loadTodayEntries();
+        this.chart = null;
+        this.chartPeriod = 30;
+
+        this.init();
     }
 
-    initEventListeners() {
-        // Food form submission
-        document.getElementById('food-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.addFood();
-        });
+    // Initialize the app
+    init() {
+        this.checkNewDay();
+        this.setupEventListeners();
+        this.updateUI();
+        this.renderQuickAddButtons();
+        this.renderFoodLog();
+        this.renderQuickAddList();
+        this.renderHistory();
+        this.initChart();
+        this.updateSettingsForm();
+        this.updateBMRDisplay();
+        this.checkWebShareSupport();
+    }
 
-        // Backup buttons
-        document.getElementById('copy-backup').addEventListener('click', () => {
-            this.copyBackup();
-        });
-
-        document.getElementById('paste-backup').addEventListener('click', () => {
-            this.openPasteModal();
-        });
-
-        // Modal buttons
-        document.getElementById('restore-btn').addEventListener('click', () => {
-            this.restoreBackup();
-        });
-
-        document.getElementById('cancel-btn').addEventListener('click', () => {
-            this.closePasteModal();
-        });
-
-        // Close modal on outside click
-        document.getElementById('paste-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'paste-modal') {
-                this.closePasteModal();
+    // Check if Web Share API is supported (iOS Safari, Android Chrome, etc.)
+    checkWebShareSupport() {
+        if (navigator.share) {
+            const shareBtn = document.getElementById('shareDataBtn');
+            if (shareBtn) {
+                shareBtn.style.display = 'block';
             }
+        }
+    }
+
+    // ========================================================================
+    // DATE & DAY MANAGEMENT
+    // ========================================================================
+
+    getTodayDate() {
+        const today = new Date();
+        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    }
+
+    formatDate(dateString) {
+        const date = new Date(dateString + 'T00:00:00');
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
         });
     }
 
-    addFood() {
-        const nameInput = document.getElementById('food-name');
-        const caloriesInput = document.getElementById('food-calories');
+    checkNewDay() {
+        const today = this.getTodayDate();
+        const lastDate = localStorage.getItem('lastActiveDate');
 
-        const food = {
+        if (lastDate && lastDate !== today) {
+            // New day detected - archive previous day
+            this.archivePreviousDay(lastDate);
+            this.todayEntries = [];
+            this.saveTodayEntries();
+        }
+
+        localStorage.setItem('lastActiveDate', today);
+        this.currentDate = today;
+
+        // Update date display
+        document.getElementById('currentDate').textContent = this.formatDate(today);
+    }
+
+    archivePreviousDay(date) {
+        const entries = this.loadFromStorage('todayEntries') || [];
+        const total = entries.reduce((sum, entry) => sum + entry.calories, 0);
+
+        if (entries.length > 0) {
+            this.dailyHistory[date] = {
+                total: total,
+                entries: entries,
+                goal: this.userProfile.dailyGoal,
+                date: date
+            };
+            this.saveDailyHistory();
+        }
+    }
+
+    // ========================================================================
+    // LOCAL STORAGE OPERATIONS
+    // ========================================================================
+
+    saveToStorage(key, data) {
+        try {
+            localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) {
+            console.error('Error saving to localStorage:', e);
+            alert('Error saving data. Storage may be full.');
+        }
+    }
+
+    loadFromStorage(key, defaultValue = null) {
+        try {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : defaultValue;
+        } catch (e) {
+            console.error('Error loading from localStorage:', e);
+            return defaultValue;
+        }
+    }
+
+    // User Profile
+    loadUserProfile() {
+        const defaultProfile = {
+            weight: 200,
+            height: 70,
+            age: 30,
+            gender: 'male',
+            exerciseCalories: 75,
+            bmr: 1850,
+            dailyGoal: 1350
+        };
+        return this.loadFromStorage('userProfile', defaultProfile);
+    }
+
+    saveUserProfile() {
+        this.saveToStorage('userProfile', this.userProfile);
+    }
+
+    // Quick Add Items
+    loadQuickAddItems() {
+        return this.loadFromStorage('quickAddItems', []);
+    }
+
+    saveQuickAddItems() {
+        this.saveToStorage('quickAddItems', this.quickAddItems);
+    }
+
+    // Today's Entries
+    loadTodayEntries() {
+        return this.loadFromStorage('todayEntries', []);
+    }
+
+    saveTodayEntries() {
+        this.saveToStorage('todayEntries', this.todayEntries);
+    }
+
+    // Daily History
+    loadDailyHistory() {
+        return this.loadFromStorage('dailyHistory', {});
+    }
+
+    saveDailyHistory() {
+        this.saveToStorage('dailyHistory', this.dailyHistory);
+    }
+
+    // ========================================================================
+    // BMR CALCULATION
+    // ========================================================================
+
+    calculateBMR(weight, height, age, gender) {
+        // Convert lbs to kg, inches to cm
+        const weightKg = weight * 0.453592;
+        const heightCm = height * 2.54;
+
+        // Mifflin-St Jeor Equation
+        let bmr;
+        if (gender === 'male') {
+            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age) + 5;
+        } else {
+            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age) - 161;
+        }
+
+        return Math.round(bmr);
+    }
+
+    updateBMR() {
+        const { weight, height, age, gender } = this.userProfile;
+        this.userProfile.bmr = this.calculateBMR(weight, height, age || 30, gender);
+        this.userProfile.dailyGoal = this.userProfile.bmr - 500;
+        this.saveUserProfile();
+    }
+
+    // ========================================================================
+    // CALORIE TRACKING
+    // ========================================================================
+
+    addFoodEntry(name, calories) {
+        const entry = {
             id: Date.now(),
-            name: nameInput.value.trim(),
-            calories: parseInt(caloriesInput.value),
+            name: name.trim(),
+            calories: parseInt(calories),
             timestamp: new Date().toISOString()
         };
 
-        this.foods.push(food);
-        this.saveToLocalStorage();
-        this.render();
-
-        // Clear form
-        nameInput.value = '';
-        caloriesInput.value = '';
-        nameInput.focus();
+        this.todayEntries.push(entry);
+        this.saveTodayEntries();
+        this.updateUI();
+        this.renderFoodLog();
     }
 
-    deleteFood(id) {
-        this.foods = this.foods.filter(food => food.id !== id);
-        this.saveToLocalStorage();
-        this.render();
+    deleteFoodEntry(id) {
+        this.todayEntries = this.todayEntries.filter(entry => entry.id !== id);
+        this.saveTodayEntries();
+        this.updateUI();
+        this.renderFoodLog();
     }
 
-    getTotalCalories() {
-        return this.foods.reduce((total, food) => total + food.calories, 0);
+    getTodayTotal() {
+        return this.todayEntries.reduce((sum, entry) => sum + entry.calories, 0);
     }
 
-    render() {
-        const totalCalories = this.getTotalCalories();
-        const remaining = this.dailyGoal - totalCalories;
-
-        // Update stats
-        document.getElementById('total-calories').textContent = totalCalories;
-        document.getElementById('daily-goal').textContent = this.dailyGoal;
-        document.getElementById('remaining-calories').textContent = remaining;
-
-        // Update remaining color
-        const remainingEl = document.getElementById('remaining-calories');
-        remainingEl.style.color = remaining >= 0 ? '#fff' : '#ff6b6b';
-
-        // Render food list
-        const foodsList = document.getElementById('foods');
-        foodsList.innerHTML = '';
-
-        if (this.foods.length === 0) {
-            foodsList.innerHTML = '<li style="text-align: center; color: #999;">No foods added yet</li>';
-            return;
-        }
-
-        this.foods.forEach(food => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <div class="food-info">
-                    <span class="food-name">${this.escapeHtml(food.name)}</span>
-                    <span class="food-calories">${food.calories} cal</span>
-                </div>
-                <button onclick="tracker.deleteFood(${food.id})">Delete</button>
-            `;
-            foodsList.appendChild(li);
-        });
+    getRemainingCalories() {
+        return this.userProfile.dailyGoal - this.getTodayTotal();
     }
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    // ========================================================================
+    // QUICK ADD ITEMS
+    // ========================================================================
 
-    saveToLocalStorage() {
-        localStorage.setItem('calorieTrackerData', JSON.stringify({
-            foods: this.foods,
-            dailyGoal: this.dailyGoal
-        }));
-    }
-
-    loadFromLocalStorage() {
-        try {
-            const data = localStorage.getItem('calorieTrackerData');
-            if (data) {
-                const parsed = JSON.parse(data);
-                this.foods = parsed.foods || [];
-                this.dailyGoal = parsed.dailyGoal || 2000;
-            }
-        } catch (error) {
-            console.error('Error loading from localStorage:', error);
-        }
-    }
-
-    copyBackup() {
-        const backupData = {
-            version: 1,
-            timestamp: new Date().toISOString(),
-            data: {
-                foods: this.foods,
-                dailyGoal: this.dailyGoal
-            }
+    addQuickAddItem(name, calories) {
+        const item = {
+            id: Date.now(),
+            name: name.trim(),
+            calories: parseInt(calories)
         };
 
-        const backupString = JSON.stringify(backupData);
-
-        // Copy to clipboard
-        navigator.clipboard.writeText(backupString).then(() => {
-            this.showStatus('Backup copied to clipboard!', 'success');
-        }).catch(() => {
-            // Fallback for older browsers
-            this.fallbackCopy(backupString);
-        });
+        this.quickAddItems.push(item);
+        this.saveQuickAddItems();
+        this.renderQuickAddButtons();
+        this.renderQuickAddList();
     }
 
-    fallbackCopy(text) {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
+    deleteQuickAddItem(id) {
+        this.quickAddItems = this.quickAddItems.filter(item => item.id !== id);
+        this.saveQuickAddItems();
+        this.renderQuickAddButtons();
+        this.renderQuickAddList();
+    }
 
-        try {
-            document.execCommand('copy');
-            this.showStatus('Backup copied to clipboard!', 'success');
-        } catch (error) {
-            this.showStatus('Failed to copy backup. Please copy manually.', 'error');
+    // ========================================================================
+    // UI RENDERING
+    // ========================================================================
+
+    updateUI() {
+        const total = this.getTodayTotal();
+        const goal = this.userProfile.dailyGoal;
+        const remaining = this.getRemainingCalories();
+        const percentage = Math.min((total / goal) * 100, 100);
+
+        // Update stats
+        document.getElementById('dailyGoal').textContent = goal;
+        document.getElementById('consumedCalories').textContent = total;
+        document.getElementById('remainingCalories').textContent = remaining;
+
+        // Update progress bar
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.setProperty('--progress', percentage + '%');
+
+        // Color coding
+        progressBar.classList.remove('warning', 'danger');
+        if (percentage >= 100) {
+            progressBar.classList.add('danger');
+        } else if (percentage >= 80) {
+            progressBar.classList.add('warning');
         }
 
-        document.body.removeChild(textarea);
+        // Update progress text
+        document.getElementById('progressText').textContent =
+            `${Math.round(percentage)}% of daily goal`;
     }
 
-    openPasteModal() {
-        document.getElementById('paste-modal').classList.add('active');
-        document.getElementById('backup-input').value = '';
-        document.getElementById('paste-error').classList.remove('active');
-        document.getElementById('backup-input').focus();
-    }
+    renderQuickAddButtons() {
+        const grid = document.getElementById('quickAddGrid');
 
-    closePasteModal() {
-        document.getElementById('paste-modal').classList.remove('active');
-    }
-
-    restoreBackup() {
-        const input = document.getElementById('backup-input').value;
-        const errorEl = document.getElementById('paste-error');
-
-        // Clear previous error
-        errorEl.classList.remove('active');
-
-        // Validate and parse backup
-        const result = this.parseBackupData(input);
-
-        if (!result.success) {
-            errorEl.textContent = result.error;
-            errorEl.classList.add('active');
+        if (this.quickAddItems.length === 0) {
+            grid.innerHTML = '<p class="empty-message">No quick-add items yet. Add some in the Quick Add tab!</p>';
             return;
         }
 
-        // Restore data
+        grid.innerHTML = this.quickAddItems.map(item => `
+            <button class="quick-add-btn" data-id="${item.id}" data-name="${item.name}" data-calories="${item.calories}">
+                <span class="name">${item.name}</span>
+                <span class="calories">${item.calories} cal</span>
+            </button>
+        `).join('');
+    }
+
+    renderFoodLog() {
+        const log = document.getElementById('foodLog');
+
+        if (this.todayEntries.length === 0) {
+            log.innerHTML = '<p class="empty-message">No items added yet today.</p>';
+            return;
+        }
+
+        log.innerHTML = this.todayEntries
+            .sort((a, b) => b.id - a.id) // Most recent first
+            .map(entry => {
+                const time = new Date(entry.timestamp).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+                return `
+                    <div class="log-item">
+                        <div class="log-item-info">
+                            <div class="log-item-name">${entry.name}</div>
+                            <div class="log-item-time">${time}</div>
+                        </div>
+                        <span class="log-item-calories">${entry.calories}</span>
+                        <button class="delete-btn" data-id="${entry.id}">Delete</button>
+                    </div>
+                `;
+            }).join('');
+    }
+
+    renderQuickAddList() {
+        const list = document.getElementById('quickAddList');
+
+        if (this.quickAddItems.length === 0) {
+            list.innerHTML = '<p class="empty-message">No saved items yet.</p>';
+            return;
+        }
+
+        list.innerHTML = this.quickAddItems.map(item => `
+            <div class="quick-add-item">
+                <div class="item-info">
+                    <div class="item-name">${item.name}</div>
+                </div>
+                <span class="item-calories">${item.calories} cal</span>
+                <button class="delete-btn" data-id="${item.id}">Delete</button>
+            </div>
+        `).join('');
+    }
+
+    renderHistory() {
+        const historyList = document.getElementById('historyList');
+        const entries = Object.values(this.dailyHistory).sort((a, b) => {
+            return new Date(b.date) - new Date(a.date);
+        });
+
+        if (entries.length === 0) {
+            historyList.innerHTML = '<p class="empty-message">No history yet. Start tracking today!</p>';
+            return;
+        }
+
+        historyList.innerHTML = entries.map(day => {
+            const percentage = (day.total / day.goal) * 100;
+            let statusClass = 'success';
+            let statusText = 'On Track';
+
+            if (percentage >= 100) {
+                statusClass = 'danger';
+                statusText = 'Over Goal';
+            } else if (percentage >= 90) {
+                statusClass = 'warning';
+                statusText = 'Near Goal';
+            }
+
+            return `
+                <div class="history-item">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div>
+                            <div class="history-date">${this.formatDate(day.date)}</div>
+                            <div class="history-goal">Goal: ${day.goal} cal</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="history-total">${day.total} cal</div>
+                            <span class="history-status ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ========================================================================
+    // CHART & VISUALIZATION
+    // ========================================================================
+
+    initChart() {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+
+        this.updateChart(this.chartPeriod);
+    }
+
+    updateChart(days) {
+        this.chartPeriod = days;
+
+        // Get historical data
+        let entries = Object.values(this.dailyHistory).sort((a, b) => {
+            return new Date(a.date) - new Date(b.date);
+        });
+
+        // Filter by period
+        if (days !== 'all') {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+            entries = entries.filter(day => new Date(day.date) >= cutoffDate);
+        }
+
+        // Prepare chart data
+        const labels = entries.map(day => this.formatDate(day.date).split(',')[0]);
+        const data = entries.map(day => day.total);
+        const goalLine = entries.map(day => day.goal);
+
+        // Calculate average
+        const average = entries.length > 0
+            ? Math.round(data.reduce((sum, val) => sum + val, 0) / data.length)
+            : 0;
+
+        document.getElementById('avgCalories').textContent = average + ' cal';
+        document.getElementById('daysTracked').textContent = entries.length;
+
+        // Destroy existing chart
+        if (this.chart) {
+            this.chart.destroy();
+        }
+
+        // Create new chart
+        const ctx = document.getElementById('trendChart');
+        this.chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Calories Consumed',
+                        data: data,
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Daily Goal',
+                        data: goalLine,
+                        borderColor: '#FF9800',
+                        borderDash: [5, 5],
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Calories'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updateSettingsForm() {
+        document.getElementById('weight').value = this.userProfile.weight;
+        document.getElementById('height').value = this.userProfile.height;
+        document.getElementById('age').value = this.userProfile.age || '';
+        document.getElementById('gender').value = this.userProfile.gender;
+        document.getElementById('exerciseCalories').value = this.userProfile.exerciseCalories;
+    }
+
+    updateBMRDisplay() {
+        document.getElementById('bmrValue').textContent = this.userProfile.bmr;
+        document.getElementById('goalValue').textContent = this.userProfile.dailyGoal;
+    }
+
+    // ========================================================================
+    // EVENT LISTENERS
+    // ========================================================================
+
+    setupEventListeners() {
+        // Tab navigation
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const targetTab = e.target.dataset.tab;
+                this.switchTab(targetTab);
+            });
+        });
+
+        // Add food form
+        document.getElementById('addFoodForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('foodName').value;
+            const calories = document.getElementById('foodCalories').value;
+
+            if (name && calories) {
+                this.addFoodEntry(name, calories);
+                e.target.reset();
+            }
+        });
+
+        // Quick add buttons (delegated)
+        document.getElementById('quickAddGrid').addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-add-btn');
+            if (btn) {
+                const name = btn.dataset.name;
+                const calories = btn.dataset.calories;
+                this.addFoodEntry(name, calories);
+
+                // Visual feedback
+                btn.style.transform = 'scale(0.95)';
+                setTimeout(() => btn.style.transform = 'scale(1)', 150);
+            }
+        });
+
+        // Delete food entry (delegated)
+        document.getElementById('foodLog').addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                const id = parseInt(e.target.dataset.id);
+                this.deleteFoodEntry(id);
+            }
+        });
+
+        // Save quick add item form
+        document.getElementById('saveQuickAddForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('quickAddName').value;
+            const calories = document.getElementById('quickAddCalories').value;
+
+            if (name && calories) {
+                this.addQuickAddItem(name, calories);
+                e.target.reset();
+            }
+        });
+
+        // Delete quick add item (delegated)
+        document.getElementById('quickAddList').addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                const id = parseInt(e.target.dataset.id);
+                this.deleteQuickAddItem(id);
+            }
+        });
+
+        // Settings form
+        document.getElementById('settingsForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.userProfile.weight = parseFloat(document.getElementById('weight').value);
+            this.userProfile.height = parseFloat(document.getElementById('height').value);
+            this.userProfile.age = parseInt(document.getElementById('age').value) || 30;
+            this.userProfile.gender = document.getElementById('gender').value;
+            this.userProfile.exerciseCalories = parseInt(document.getElementById('exerciseCalories').value) || 0;
+
+            this.updateBMR();
+            this.updateUI();
+            this.updateBMRDisplay();
+
+            alert('Settings saved successfully!');
+        });
+
+        // Chart period buttons
+        document.querySelectorAll('.chart-controls .btn-small').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.chart-controls .btn-small').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+
+                const period = e.target.dataset.period;
+                this.updateChart(period === 'all' ? 'all' : parseInt(period));
+            });
+        });
+
+        // Share backup (iOS/Android native share sheet)
+        const shareBtn = document.getElementById('shareDataBtn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                this.shareData();
+            });
+        }
+
+        // Export data (download)
+        document.getElementById('exportDataBtn').addEventListener('click', () => {
+            this.exportData();
+        });
+
+        // Copy backup to clipboard
+        document.getElementById('copyDataBtn').addEventListener('click', () => {
+            this.copyDataToClipboard();
+        });
+
+        // Import from file
+        document.getElementById('importFile').addEventListener('change', (e) => {
+            this.handleFileImport(e);
+        });
+
+        // Paste backup from clipboard
+        document.getElementById('pasteDataBtn').addEventListener('click', () => {
+            this.pasteDataFromClipboard();
+        });
+
+        // Clear data
+        document.getElementById('clearDataBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
+                localStorage.clear();
+                location.reload();
+            }
+        });
+
+        // Check for new day periodically (every minute)
+        setInterval(() => {
+            this.checkNewDay();
+        }, 60000);
+    }
+
+    switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.dataset.tab === tabName) {
+                tab.classList.add('active');
+            }
+        });
+
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(tabName).classList.add('active');
+
+        // Refresh chart if switching to history
+        if (tabName === 'history') {
+            this.renderHistory();
+            this.updateChart(this.chartPeriod);
+        }
+    }
+
+    // ========================================================================
+    // DATA EXPORT & IMPORT
+    // ========================================================================
+
+    getBackupData() {
+        return {
+            version: '1.0',
+            userProfile: this.userProfile,
+            quickAddItems: this.quickAddItems,
+            dailyHistory: this.dailyHistory,
+            todayEntries: this.todayEntries,
+            exportDate: new Date().toISOString()
+        };
+    }
+
+    exportData() {
+        const data = this.getBackupData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `calorie-tracker-backup-${this.getTodayDate()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        alert('Backup downloaded successfully! Save this file in a safe place.');
+    }
+
+    async shareData() {
         try {
-            this.foods = result.data.foods;
-            this.dailyGoal = result.data.dailyGoal;
-            this.saveToLocalStorage();
-            this.render();
-            this.closePasteModal();
-            this.showStatus('Backup restored successfully!', 'success');
-        } catch (error) {
-            errorEl.textContent = 'Failed to restore backup. Please try again.';
-            errorEl.classList.add('active');
+            const data = this.getBackupData();
+            const jsonString = JSON.stringify(data, null, 2);
+            const fileName = `calorie-tracker-backup-${this.getTodayDate()}.json`;
+
+            // Try sharing as a file first (better for iOS Notes)
+            if (navigator.canShare) {
+                const file = new File([jsonString], fileName, { type: 'application/json' });
+
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Calorie Tracker Backup',
+                        text: `Backup from ${this.formatDate(this.getTodayDate())}`
+                    });
+                    return;
+                }
+            }
+
+            // Fallback to sharing text (still works with Notes app)
+            await navigator.share({
+                title: 'Calorie Tracker Backup',
+                text: `Calorie Tracker Backup - ${this.formatDate(this.getTodayDate())}\n\n${jsonString}`
+            });
+
+        } catch (err) {
+            // User cancelled or share failed
+            if (err.name !== 'AbortError') {
+                console.error('Share failed:', err);
+                // Fallback to copy
+                this.copyDataToClipboard();
+            }
+        }
+    }
+
+    async copyDataToClipboard() {
+        try {
+            const data = this.getBackupData();
+            const jsonString = JSON.stringify(data, null, 2);
+            await navigator.clipboard.writeText(jsonString);
+            alert('Backup copied to clipboard!\n\nPaste it into a note app or email to save it.');
+        } catch (err) {
+            alert('Failed to copy to clipboard. Try the Download option instead.');
+            console.error('Copy failed:', err);
+        }
+    }
+
+    async pasteDataFromClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+
+            // Use robust parsing with detailed error messages
+            const result = this.parseBackupData(text);
+
+            if (!result.success) {
+                alert(result.error);
+                return;
+            }
+
+            this.importData(result.data);
+        } catch (err) {
+            alert('Failed to paste backup. Make sure you copied valid backup data.\n\nError: ' + err.message);
+            console.error('Paste failed:', err);
         }
     }
 
@@ -233,7 +765,7 @@ class CalorieTracker {
         } catch (parseError) {
             return {
                 success: false,
-                error: 'Failed to paste backup. Make sure you copied valid backup data.\nError: JSON Parse error: Unable to parse JSON string'
+                error: 'Failed to paste backup. Make sure you copied valid backup data.\n\nError: JSON Parse error: Unable to parse JSON string'
             };
         }
 
@@ -245,87 +777,353 @@ class CalorieTracker {
             };
         }
 
-        // Step 5: Check for version and data fields
-        if (!parsed.data) {
+        // Step 5: Validate that it has at least some data fields
+        const hasData = parsed.userProfile || parsed.quickAddItems || parsed.dailyHistory || parsed.todayEntries;
+        if (!hasData) {
             return {
                 success: false,
-                error: 'Invalid backup format. Missing "data" field.'
+                error: 'Invalid backup format. No recognizable data found in backup.'
             };
         }
 
-        // Step 6: Validate data structure
-        const { foods, dailyGoal } = parsed.data;
-
-        if (!Array.isArray(foods)) {
-            return {
-                success: false,
-                error: 'Invalid backup format. "foods" must be an array.'
-            };
-        }
-
-        if (typeof dailyGoal !== 'number' || dailyGoal < 0) {
-            return {
-                success: false,
-                error: 'Invalid backup format. "dailyGoal" must be a positive number.'
-            };
-        }
-
-        // Step 7: Validate each food item
-        for (let i = 0; i < foods.length; i++) {
-            const food = foods[i];
-
-            if (!food || typeof food !== 'object') {
-                return {
-                    success: false,
-                    error: `Invalid food item at position ${i + 1}.`
-                };
-            }
-
-            if (!food.name || typeof food.name !== 'string') {
-                return {
-                    success: false,
-                    error: `Invalid food name at position ${i + 1}.`
-                };
-            }
-
-            if (typeof food.calories !== 'number' || food.calories < 0) {
-                return {
-                    success: false,
-                    error: `Invalid calories value at position ${i + 1}.`
-                };
-            }
-
-            // Ensure required fields
-            if (!food.id) {
-                food.id = Date.now() + i;
-            }
-
-            if (!food.timestamp) {
-                food.timestamp = new Date().toISOString();
-            }
-        }
-
-        // Step 8: Return validated data
+        // Step 6: Return validated data
         return {
             success: true,
-            data: {
-                foods: foods,
-                dailyGoal: dailyGoal
-            }
+            data: parsed
         };
     }
 
-    showStatus(message, type) {
-        const statusEl = document.getElementById('backup-status');
-        statusEl.textContent = message;
-        statusEl.className = `status-message ${type}`;
-        statusEl.style.display = 'block';
+    importData(data) {
+        try {
+            // Validate data structure
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid backup format');
+            }
 
-        setTimeout(() => {
-            statusEl.style.display = 'none';
-        }, 3000);
+            // Confirm with user before overwriting
+            const confirmMsg = `This will restore your backup from ${data.exportDate ? new Date(data.exportDate).toLocaleString() : 'unknown date'}.\n\nYour current data will be replaced. Continue?`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            // Import data with version handling
+            if (data.userProfile) {
+                this.userProfile = data.userProfile;
+                this.saveUserProfile();
+            }
+
+            if (data.quickAddItems) {
+                this.quickAddItems = data.quickAddItems;
+                this.saveQuickAddItems();
+            }
+
+            if (data.dailyHistory) {
+                this.dailyHistory = data.dailyHistory;
+                this.saveDailyHistory();
+            }
+
+            if (data.todayEntries) {
+                this.todayEntries = data.todayEntries;
+                this.saveTodayEntries();
+            }
+
+            // Refresh UI
+            this.updateUI();
+            this.renderQuickAddButtons();
+            this.renderFoodLog();
+            this.renderQuickAddList();
+            this.renderHistory();
+            this.updateSettingsForm();
+            this.updateBMRDisplay();
+            if (this.chart) {
+                this.updateChart(this.chartPeriod);
+            }
+
+            alert('Backup restored successfully! All your data is back.');
+        } catch (err) {
+            alert('Failed to import backup. Please check the file format.\n\nError: ' + err.message);
+            console.error('Import failed:', err);
+        }
+    }
+
+    handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            // Use robust parsing with detailed error messages
+            const result = this.parseBackupData(e.target.result);
+
+            if (!result.success) {
+                alert(result.error);
+                return;
+            }
+
+            this.importData(result.data);
+        };
+        reader.readAsText(file);
+
+        // Reset input so same file can be imported again
+        event.target.value = '';
     }
 }
 
-// Initialize the app
-const tracker = new CalorieTracker();
+// ============================================================================
+// PWA & SERVICE WORKER MANAGEMENT
+// ============================================================================
+
+class PWAManager {
+    constructor() {
+        this.swRegistration = null;
+        this.deferredPrompt = null;
+        this.appVersion = '1.0.0';
+
+        this.init();
+    }
+
+    init() {
+        this.registerServiceWorker();
+        this.setupInstallPrompt();
+        this.setupOfflineDetection();
+        this.setupEventListeners();
+        this.updateAppStatus();
+    }
+
+    // Register service worker for offline functionality
+    async registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try {
+                this.swRegistration = await navigator.serviceWorker.register('./service-worker.js');
+                console.log('[PWA] Service Worker registered successfully');
+
+                // Check for updates periodically
+                setInterval(() => {
+                    this.swRegistration.update();
+                }, 60000); // Check every minute
+
+                // Listen for service worker updates
+                this.swRegistration.addEventListener('updatefound', () => {
+                    const newWorker = this.swRegistration.installing;
+
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New version available
+                            this.showUpdateAvailable();
+                        }
+                    });
+                });
+
+                // Update app status
+                this.updateAppStatus();
+            } catch (error) {
+                console.error('[PWA] Service Worker registration failed:', error);
+                this.updateAppStatus();
+            }
+        } else {
+            console.warn('[PWA] Service Workers not supported');
+            this.updateAppStatus();
+        }
+    }
+
+    // Setup install prompt (Add to Home Screen)
+    setupInstallPrompt() {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredPrompt = e;
+
+            // Show install prompt after a delay
+            setTimeout(() => {
+                const dismissed = localStorage.getItem('installPromptDismissed');
+                if (!dismissed) {
+                    this.showInstallPrompt();
+                }
+            }, 3000);
+
+            // Show install button in settings
+            const installAppBtn = document.getElementById('installAppBtn');
+            if (installAppBtn) {
+                installAppBtn.style.display = 'block';
+            }
+        });
+
+        // Detect if app was installed
+        window.addEventListener('appinstalled', () => {
+            console.log('[PWA] App installed successfully');
+            this.deferredPrompt = null;
+            this.hideInstallPrompt();
+
+            const installAppBtn = document.getElementById('installAppBtn');
+            if (installAppBtn) {
+                installAppBtn.style.display = 'none';
+            }
+        });
+    }
+
+    // Setup online/offline detection
+    setupOfflineDetection() {
+        const updateOnlineStatus = () => {
+            const indicator = document.getElementById('offlineIndicator');
+            const appModeElement = document.getElementById('appMode');
+
+            if (navigator.onLine) {
+                if (indicator) indicator.style.display = 'none';
+                if (appModeElement) {
+                    appModeElement.textContent = '🌐 Online';
+                    appModeElement.classList.remove('offline');
+                    appModeElement.classList.add('online');
+                }
+            } else {
+                if (indicator) indicator.style.display = 'inline-block';
+                if (appModeElement) {
+                    appModeElement.textContent = '📴 Offline';
+                    appModeElement.classList.remove('online');
+                    appModeElement.classList.add('offline');
+                }
+            }
+        };
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+    }
+
+    setupEventListeners() {
+        // Check for updates button
+        const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+        if (checkUpdateBtn) {
+            checkUpdateBtn.addEventListener('click', () => {
+                this.checkForUpdates();
+            });
+        }
+
+        // Install app button (in banner)
+        const installBtn = document.getElementById('installBtn');
+        if (installBtn) {
+            installBtn.addEventListener('click', () => {
+                this.installApp();
+            });
+        }
+
+        // Dismiss install prompt
+        const dismissBtn = document.getElementById('dismissInstallBtn');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', () => {
+                this.hideInstallPrompt();
+                localStorage.setItem('installPromptDismissed', 'true');
+            });
+        }
+
+        // Install app button (in settings)
+        const installAppBtn = document.getElementById('installAppBtn');
+        if (installAppBtn) {
+            installAppBtn.addEventListener('click', () => {
+                this.installApp();
+            });
+        }
+    }
+
+    async checkForUpdates() {
+        const statusElement = document.getElementById('updateStatus');
+        const checkBtn = document.getElementById('checkUpdateBtn');
+
+        if (statusElement) statusElement.textContent = 'Checking...';
+        if (checkBtn) checkBtn.disabled = true;
+
+        try {
+            if (this.swRegistration) {
+                await this.swRegistration.update();
+
+                setTimeout(() => {
+                    if (statusElement) {
+                        if (navigator.serviceWorker.controller) {
+                            statusElement.textContent = '✅ Up to date';
+                        } else {
+                            statusElement.textContent = '🔄 Update available - Reload to update';
+                        }
+                    }
+                    if (checkBtn) checkBtn.disabled = false;
+                }, 1000);
+            } else {
+                if (statusElement) statusElement.textContent = '⚠️ Updates not available (no service worker)';
+                if (checkBtn) checkBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('[PWA] Update check failed:', error);
+            if (statusElement) statusElement.textContent = '❌ Check failed';
+            if (checkBtn) checkBtn.disabled = false;
+        }
+    }
+
+    showUpdateAvailable() {
+        const statusElement = document.getElementById('updateStatus');
+        if (statusElement) {
+            statusElement.textContent = '🔄 Update available!';
+        }
+
+        if (confirm('A new version is available! Reload to update?')) {
+            window.location.reload();
+        }
+    }
+
+    showInstallPrompt() {
+        const prompt = document.getElementById('installPrompt');
+        if (prompt) {
+            prompt.style.display = 'block';
+        }
+    }
+
+    hideInstallPrompt() {
+        const prompt = document.getElementById('installPrompt');
+        if (prompt) {
+            prompt.style.display = 'none';
+        }
+    }
+
+    async installApp() {
+        if (!this.deferredPrompt) {
+            alert('App is already installed or cannot be installed on this device.');
+            return;
+        }
+
+        this.deferredPrompt.prompt();
+        const { outcome } = await this.deferredPrompt.userChoice;
+
+        if (outcome === 'accepted') {
+            console.log('[PWA] User accepted install');
+            this.hideInstallPrompt();
+        }
+
+        this.deferredPrompt = null;
+    }
+
+    updateAppStatus() {
+        const appVersionElement = document.getElementById('appVersion');
+        const updateStatusElement = document.getElementById('updateStatus');
+
+        if (appVersionElement) {
+            appVersionElement.textContent = this.appVersion;
+        }
+
+        if (updateStatusElement) {
+            if ('serviceWorker' in navigator) {
+                updateStatusElement.textContent = '✅ Offline-ready';
+            } else {
+                updateStatusElement.textContent = '⚠️ Offline mode not supported';
+            }
+        }
+    }
+}
+
+// ============================================================================
+// INITIALIZE APP
+// ============================================================================
+
+let app;
+let pwaManager;
+
+document.addEventListener('DOMContentLoaded', () => {
+    app = new CalorieTracker();
+    pwaManager = new PWAManager();
+});
