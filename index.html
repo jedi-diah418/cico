@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Simple calorie tracker for weight loss with deficit tracking">
+    <meta name="theme-color" content="#4CAF50">
+    <title>Calorie Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1 class="app-title">Calorie Tracker</h1>
+        <div class="header-info">
+            <span class="current-date" id="currentDate"></span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="today">Today</button>
+            <button class="tab" data-tab="history">History</button>
+            <button class="tab" data-tab="quick-add">Quick Add</button>
+            <button class="tab" data-tab="settings">Settings</button>
+        </nav>
+
+        <!-- Today Tab -->
+        <div id="today" class="tab-content active">
+            <!-- Quick Stats Card -->
+            <div class="stats-card">
+                <div class="stat-item">
+                    <span class="stat-label">Goal</span>
+                    <span class="stat-value" id="dailyGoal">1400</span>
+                    <span class="stat-unit">cal</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Consumed</span>
+                    <span class="stat-value" id="consumedCalories">0</span>
+                    <span class="stat-unit">cal</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Remaining</span>
+                    <span class="stat-value" id="remainingCalories">1400</span>
+                    <span class="stat-unit">cal</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <p class="progress-text" id="progressText">0% of daily goal</p>
+
+            <!-- Quick Add Buttons -->
+            <div class="section">
+                <h2>Quick Add</h2>
+                <div class="quick-add-grid" id="quickAddGrid">
+                    <p class="empty-message">No quick-add items yet. Add some in the Quick Add tab!</p>
+                </div>
+            </div>
+
+            <!-- Manual Entry Form -->
+            <div class="section">
+                <h2>Add Food</h2>
+                <form class="add-form" id="addFoodForm">
+                    <input
+                        type="text"
+                        id="foodName"
+                        placeholder="Food name"
+                        required
+                        autocomplete="off"
+                    >
+                    <input
+                        type="number"
+                        id="foodCalories"
+                        placeholder="Calories"
+                        required
+                        min="1"
+                        step="1"
+                    >
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </form>
+            </div>
+
+            <!-- Today's Log -->
+            <div class="section">
+                <h2>Today's Log</h2>
+                <div class="food-log" id="foodLog">
+                    <p class="empty-message">No items added yet today.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content">
+            <div class="section">
+                <h2>Calorie Trend</h2>
+                <div class="chart-controls">
+                    <button class="btn btn-small" data-period="7">7 Days</button>
+                    <button class="btn btn-small active" data-period="30">30 Days</button>
+                    <button class="btn btn-small" data-period="all">All Time</button>
+                </div>
+                <canvas id="trendChart"></canvas>
+                <div class="chart-stats">
+                    <div class="chart-stat">
+                        <span class="label">Average:</span>
+                        <span class="value" id="avgCalories">-</span>
+                    </div>
+                    <div class="chart-stat">
+                        <span class="label">Days tracked:</span>
+                        <span class="value" id="daysTracked">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Daily History</h2>
+                <div class="history-list" id="historyList">
+                    <p class="empty-message">No history yet. Start tracking today!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Add Management Tab -->
+        <div id="quick-add" class="tab-content">
+            <div class="section">
+                <h2>Manage Quick-Add Items</h2>
+                <p class="description">Save frequently eaten items for one-tap adding</p>
+
+                <form class="add-form" id="saveQuickAddForm">
+                    <input
+                        type="text"
+                        id="quickAddName"
+                        placeholder="Item name"
+                        required
+                        autocomplete="off"
+                    >
+                    <input
+                        type="number"
+                        id="quickAddCalories"
+                        placeholder="Calories"
+                        required
+                        min="1"
+                        step="1"
+                    >
+                    <button type="submit" class="btn btn-primary">Save Item</button>
+                </form>
+
+                <div class="quick-add-list" id="quickAddList">
+                    <p class="empty-message">No saved items yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="section">
+                <h2>Profile Settings</h2>
+                <form class="settings-form" id="settingsForm">
+                    <div class="form-group">
+                        <label for="weight">Weight (lbs)</label>
+                        <input type="number" id="weight" value="200" min="50" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label for="height">Height (inches)</label>
+                        <input type="number" id="height" value="70" min="48" max="96">
+                    </div>
+                    <div class="form-group">
+                        <label for="age">Age (optional)</label>
+                        <input type="number" id="age" placeholder="30" min="10" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label for="gender">Gender</label>
+                        <select id="gender">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="exerciseCalories">Daily Exercise Burn (optional)</label>
+                        <input type="number" id="exerciseCalories" value="75" min="0" max="2000">
+                        <small>Estimated: 50-100 cal for your kettlebell routine</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+
+                <div class="bmr-info">
+                    <h3>Your Metabolism</h3>
+                    <div class="info-item">
+                        <span class="label">BMR (Base Metabolic Rate):</span>
+                        <span class="value" id="bmrValue">1850</span>
+                        <span class="unit">cal/day</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Daily Goal (500 cal deficit):</span>
+                        <span class="value" id="goalValue">1350</span>
+                        <span class="unit">cal/day</span>
+                    </div>
+                    <p class="info-text">
+                        A 500 calorie daily deficit should result in ~1 lb weight loss per week.
+                    </p>
+                </div>
+
+                <div class="section">
+                    <h3>Data Management</h3>
+                    <button class="btn btn-secondary" id="exportDataBtn">Export Data</button>
+                    <button class="btn btn-danger" id="clearDataBtn">Clear All Data</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2025 Calorie Tracker | Stay consistent, reach your goals!</p>
+    </footer>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Main App Script -->
+    <script src="app.js"></script>
+</body>
+</html>
