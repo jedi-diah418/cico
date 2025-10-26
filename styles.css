@@ -49,6 +49,65 @@ body {
 .header-info {
     font-size: 0.9rem;
     opacity: 0.9;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.offline-indicator {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Install Prompt */
+.install-prompt {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    padding: 1rem;
+    box-shadow: var(--shadow);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.install-content {
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.install-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.install-buttons .btn {
+    background: white;
+    color: var(--primary-color);
+    border: 2px solid white;
+}
+
+.install-buttons .btn-primary {
+    background: var(--primary-dark);
+    color: white;
 }
 
 /* Container */
@@ -543,6 +602,48 @@ select:focus {
     font-size: 0.9rem;
     color: var(--text-secondary);
     font-style: italic;
+}
+
+/* App Status */
+.app-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--bg-color);
+    border-radius: var(--border-radius);
+}
+
+.app-status .status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.app-status .status-item:last-child {
+    border-bottom: none;
+}
+
+.app-status .label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.app-status .value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.app-status .value.online {
+    color: var(--primary-color);
+}
+
+.app-status .value.offline {
+    color: var(--warning-color);
 }
 
 /* Empty Message */

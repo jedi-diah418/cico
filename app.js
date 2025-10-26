@@ -814,11 +814,259 @@ class CalorieTracker {
 }
 
 // ============================================================================
+// PWA & SERVICE WORKER MANAGEMENT
+// ============================================================================
+
+class PWAManager {
+    constructor() {
+        this.swRegistration = null;
+        this.deferredPrompt = null;
+        this.appVersion = '1.0.0';
+
+        this.init();
+    }
+
+    init() {
+        this.registerServiceWorker();
+        this.setupInstallPrompt();
+        this.setupOfflineDetection();
+        this.setupEventListeners();
+        this.updateAppStatus();
+    }
+
+    // Register service worker for offline functionality
+    async registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try {
+                this.swRegistration = await navigator.serviceWorker.register('./service-worker.js');
+                console.log('[PWA] Service Worker registered successfully');
+
+                // Check for updates periodically
+                setInterval(() => {
+                    this.swRegistration.update();
+                }, 60000); // Check every minute
+
+                // Listen for service worker updates
+                this.swRegistration.addEventListener('updatefound', () => {
+                    const newWorker = this.swRegistration.installing;
+
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New version available
+                            this.showUpdateAvailable();
+                        }
+                    });
+                });
+
+                // Update app status
+                this.updateAppStatus();
+            } catch (error) {
+                console.error('[PWA] Service Worker registration failed:', error);
+                this.updateAppStatus();
+            }
+        } else {
+            console.warn('[PWA] Service Workers not supported');
+            this.updateAppStatus();
+        }
+    }
+
+    // Setup install prompt (Add to Home Screen)
+    setupInstallPrompt() {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredPrompt = e;
+
+            // Show install prompt after a delay
+            setTimeout(() => {
+                const dismissed = localStorage.getItem('installPromptDismissed');
+                if (!dismissed) {
+                    this.showInstallPrompt();
+                }
+            }, 3000);
+
+            // Show install button in settings
+            const installAppBtn = document.getElementById('installAppBtn');
+            if (installAppBtn) {
+                installAppBtn.style.display = 'block';
+            }
+        });
+
+        // Detect if app was installed
+        window.addEventListener('appinstalled', () => {
+            console.log('[PWA] App installed successfully');
+            this.deferredPrompt = null;
+            this.hideInstallPrompt();
+
+            const installAppBtn = document.getElementById('installAppBtn');
+            if (installAppBtn) {
+                installAppBtn.style.display = 'none';
+            }
+        });
+    }
+
+    // Setup online/offline detection
+    setupOfflineDetection() {
+        const updateOnlineStatus = () => {
+            const indicator = document.getElementById('offlineIndicator');
+            const appModeElement = document.getElementById('appMode');
+
+            if (navigator.onLine) {
+                if (indicator) indicator.style.display = 'none';
+                if (appModeElement) {
+                    appModeElement.textContent = '🌐 Online';
+                    appModeElement.classList.remove('offline');
+                    appModeElement.classList.add('online');
+                }
+            } else {
+                if (indicator) indicator.style.display = 'inline-block';
+                if (appModeElement) {
+                    appModeElement.textContent = '📴 Offline';
+                    appModeElement.classList.remove('online');
+                    appModeElement.classList.add('offline');
+                }
+            }
+        };
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+    }
+
+    setupEventListeners() {
+        // Check for updates button
+        const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+        if (checkUpdateBtn) {
+            checkUpdateBtn.addEventListener('click', () => {
+                this.checkForUpdates();
+            });
+        }
+
+        // Install app button (in banner)
+        const installBtn = document.getElementById('installBtn');
+        if (installBtn) {
+            installBtn.addEventListener('click', () => {
+                this.installApp();
+            });
+        }
+
+        // Dismiss install prompt
+        const dismissBtn = document.getElementById('dismissInstallBtn');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', () => {
+                this.hideInstallPrompt();
+                localStorage.setItem('installPromptDismissed', 'true');
+            });
+        }
+
+        // Install app button (in settings)
+        const installAppBtn = document.getElementById('installAppBtn');
+        if (installAppBtn) {
+            installAppBtn.addEventListener('click', () => {
+                this.installApp();
+            });
+        }
+    }
+
+    async checkForUpdates() {
+        const statusElement = document.getElementById('updateStatus');
+        const checkBtn = document.getElementById('checkUpdateBtn');
+
+        if (statusElement) statusElement.textContent = 'Checking...';
+        if (checkBtn) checkBtn.disabled = true;
+
+        try {
+            if (this.swRegistration) {
+                await this.swRegistration.update();
+
+                setTimeout(() => {
+                    if (statusElement) {
+                        if (navigator.serviceWorker.controller) {
+                            statusElement.textContent = '✅ Up to date';
+                        } else {
+                            statusElement.textContent = '🔄 Update available - Reload to update';
+                        }
+                    }
+                    if (checkBtn) checkBtn.disabled = false;
+                }, 1000);
+            } else {
+                if (statusElement) statusElement.textContent = '⚠️ Updates not available (no service worker)';
+                if (checkBtn) checkBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('[PWA] Update check failed:', error);
+            if (statusElement) statusElement.textContent = '❌ Check failed';
+            if (checkBtn) checkBtn.disabled = false;
+        }
+    }
+
+    showUpdateAvailable() {
+        const statusElement = document.getElementById('updateStatus');
+        if (statusElement) {
+            statusElement.textContent = '🔄 Update available!';
+        }
+
+        if (confirm('A new version is available! Reload to update?')) {
+            window.location.reload();
+        }
+    }
+
+    showInstallPrompt() {
+        const prompt = document.getElementById('installPrompt');
+        if (prompt) {
+            prompt.style.display = 'block';
+        }
+    }
+
+    hideInstallPrompt() {
+        const prompt = document.getElementById('installPrompt');
+        if (prompt) {
+            prompt.style.display = 'none';
+        }
+    }
+
+    async installApp() {
+        if (!this.deferredPrompt) {
+            alert('App is already installed or cannot be installed on this device.');
+            return;
+        }
+
+        this.deferredPrompt.prompt();
+        const { outcome } = await this.deferredPrompt.userChoice;
+
+        if (outcome === 'accepted') {
+            console.log('[PWA] User accepted install');
+            this.hideInstallPrompt();
+        }
+
+        this.deferredPrompt = null;
+    }
+
+    updateAppStatus() {
+        const appVersionElement = document.getElementById('appVersion');
+        const updateStatusElement = document.getElementById('updateStatus');
+
+        if (appVersionElement) {
+            appVersionElement.textContent = this.appVersion;
+        }
+
+        if (updateStatusElement) {
+            if ('serviceWorker' in navigator) {
+                updateStatusElement.textContent = '✅ Offline-ready';
+            } else {
+                updateStatusElement.textContent = '⚠️ Offline mode not supported';
+            }
+        }
+    }
+}
+
+// ============================================================================
 // INITIALIZE APP
 // ============================================================================
 
 let app;
+let pwaManager;
 
 document.addEventListener('DOMContentLoaded', () => {
     app = new CalorieTracker();
+    pwaManager = new PWAManager();
 });

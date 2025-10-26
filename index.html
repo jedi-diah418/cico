@@ -5,7 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Simple calorie tracker for weight loss with deficit tracking">
     <meta name="theme-color" content="#4CAF50">
+
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Calorie Tracker">
+
     <title>Calorie Tracker</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%234CAF50' width='192' height='192' rx='32'/%3E%3Ctext x='96' y='140' font-size='120' text-anchor='middle' fill='white'%3E🍎%3C/text%3E%3C/svg%3E">
+
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,8 +28,20 @@
         <h1 class="app-title">Calorie Tracker</h1>
         <div class="header-info">
             <span class="current-date" id="currentDate"></span>
+            <span class="offline-indicator" id="offlineIndicator" style="display: none;">📴 Offline</span>
         </div>
     </header>
+
+    <!-- Install Prompt (shown when app can be installed) -->
+    <div class="install-prompt" id="installPrompt" style="display: none;">
+        <div class="install-content">
+            <span>📱 Install app for offline use?</span>
+            <div class="install-buttons">
+                <button class="btn btn-small btn-primary" id="installBtn">Install</button>
+                <button class="btn btn-small" id="dismissInstallBtn">Later</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Container -->
     <main class="container">
@@ -202,6 +228,29 @@
                     <p class="info-text">
                         A 500 calorie daily deficit should result in ~1 lb weight loss per week.
                     </p>
+                </div>
+
+                <div class="section">
+                    <h3>App Status</h3>
+                    <div class="app-status">
+                        <div class="status-item">
+                            <span class="label">Mode:</span>
+                            <span class="value" id="appMode">Loading...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Version:</span>
+                            <span class="value" id="appVersion">1.0.0</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Status:</span>
+                            <span class="value" id="updateStatus">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="checkUpdateBtn">🔄 Check for Updates</button>
+                        <button class="btn btn-secondary" id="installAppBtn" style="display: none;">📱 Install App</button>
+                    </div>
                 </div>
 
                 <div class="section">
