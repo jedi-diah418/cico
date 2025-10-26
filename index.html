@@ -206,8 +206,22 @@
 
                 <div class="section">
                     <h3>Data Management</h3>
-                    <button class="btn btn-secondary" id="exportDataBtn">Export Data</button>
-                    <button class="btn btn-danger" id="clearDataBtn">Clear All Data</button>
+                    <p class="description">Backup your data before updates or switching devices</p>
+
+                    <div class="backup-buttons">
+                        <button class="btn btn-secondary" id="exportDataBtn">Download Backup</button>
+                        <button class="btn btn-secondary" id="copyDataBtn">Copy Backup</button>
+                    </div>
+
+                    <div class="import-section">
+                        <label for="importFile" class="btn btn-primary" style="margin-top: 1rem;">
+                            Import Backup
+                            <input type="file" id="importFile" accept=".json" style="display: none;">
+                        </label>
+                        <button class="btn btn-primary" id="pasteDataBtn" style="margin-top: 1rem;">Paste Backup</button>
+                    </div>
+
+                    <button class="btn btn-danger" id="clearDataBtn" style="margin-top: 1rem;">Clear All Data</button>
                 </div>
             </div>
         </div>

@@ -576,9 +576,24 @@ class CalorieTracker {
             });
         });
 
-        // Export data
+        // Export data (download)
         document.getElementById('exportDataBtn').addEventListener('click', () => {
             this.exportData();
+        });
+
+        // Copy backup to clipboard
+        document.getElementById('copyDataBtn').addEventListener('click', () => {
+            this.copyDataToClipboard();
+        });
+
+        // Import from file
+        document.getElementById('importFile').addEventListener('change', (e) => {
+            this.handleFileImport(e);
+        });
+
+        // Paste backup from clipboard
+        document.getElementById('pasteDataBtn').addEventListener('click', () => {
+            this.pasteDataFromClipboard();
         });
 
         // Clear data
@@ -618,18 +633,22 @@ class CalorieTracker {
     }
 
     // ========================================================================
-    // DATA EXPORT
+    // DATA EXPORT & IMPORT
     // ========================================================================
 
-    exportData() {
-        const data = {
+    getBackupData() {
+        return {
+            version: '1.0',
             userProfile: this.userProfile,
             quickAddItems: this.quickAddItems,
             dailyHistory: this.dailyHistory,
             todayEntries: this.todayEntries,
             exportDate: new Date().toISOString()
         };
+    }
 
+    exportData() {
+        const data = this.getBackupData();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -638,7 +657,104 @@ class CalorieTracker {
         a.click();
         URL.revokeObjectURL(url);
 
-        alert('Data exported successfully!');
+        alert('Backup downloaded successfully! Save this file in a safe place.');
+    }
+
+    async copyDataToClipboard() {
+        try {
+            const data = this.getBackupData();
+            const jsonString = JSON.stringify(data, null, 2);
+            await navigator.clipboard.writeText(jsonString);
+            alert('Backup copied to clipboard!\n\nPaste it into a note app or email to save it.');
+        } catch (err) {
+            alert('Failed to copy to clipboard. Try the Download option instead.');
+            console.error('Copy failed:', err);
+        }
+    }
+
+    async pasteDataFromClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const data = JSON.parse(text);
+            this.importData(data);
+        } catch (err) {
+            alert('Failed to paste backup. Make sure you copied valid backup data.\n\nError: ' + err.message);
+            console.error('Paste failed:', err);
+        }
+    }
+
+    importData(data) {
+        try {
+            // Validate data structure
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid backup format');
+            }
+
+            // Confirm with user before overwriting
+            const confirmMsg = `This will restore your backup from ${data.exportDate ? new Date(data.exportDate).toLocaleString() : 'unknown date'}.\n\nYour current data will be replaced. Continue?`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            // Import data with version handling
+            if (data.userProfile) {
+                this.userProfile = data.userProfile;
+                this.saveUserProfile();
+            }
+
+            if (data.quickAddItems) {
+                this.quickAddItems = data.quickAddItems;
+                this.saveQuickAddItems();
+            }
+
+            if (data.dailyHistory) {
+                this.dailyHistory = data.dailyHistory;
+                this.saveDailyHistory();
+            }
+
+            if (data.todayEntries) {
+                this.todayEntries = data.todayEntries;
+                this.saveTodayEntries();
+            }
+
+            // Refresh UI
+            this.updateUI();
+            this.renderQuickAddButtons();
+            this.renderFoodLog();
+            this.renderQuickAddList();
+            this.renderHistory();
+            this.updateSettingsForm();
+            this.updateBMRDisplay();
+            if (this.chart) {
+                this.updateChart(this.chartPeriod);
+            }
+
+            alert('Backup restored successfully! All your data is back.');
+        } catch (err) {
+            alert('Failed to import backup. Please check the file format.\n\nError: ' + err.message);
+            console.error('Import failed:', err);
+        }
+    }
+
+    handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                this.importData(data);
+            } catch (err) {
+                alert('Failed to read backup file. Please check the file format.');
+                console.error('File read failed:', err);
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset input so same file can be imported again
+        event.target.value = '';
     }
 }
 
