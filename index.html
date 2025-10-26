@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calorie Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Calorie Tracker</h1>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Today's Total</h3>
+                <p id="total-calories">0</p>
+                <span>calories</span>
+            </div>
+            <div class="stat-card">
+                <h3>Daily Goal</h3>
+                <p id="daily-goal">2000</p>
+                <span>calories</span>
+            </div>
+            <div class="stat-card">
+                <h3>Remaining</h3>
+                <p id="remaining-calories">2000</p>
+                <span>calories</span>
+            </div>
+        </div>
+
+        <div class="add-food">
+            <h2>Add Food</h2>
+            <form id="food-form">
+                <input type="text" id="food-name" placeholder="Food name" required>
+                <input type="number" id="food-calories" placeholder="Calories" required min="0">
+                <button type="submit">Add</button>
+            </form>
+        </div>
+
+        <div class="food-list">
+            <h2>Today's Foods</h2>
+            <ul id="foods"></ul>
+        </div>
+
+        <div class="backup-section">
+            <h2>Backup & Restore</h2>
+            <div class="backup-buttons">
+                <button id="copy-backup" class="btn-primary">Copy Backup</button>
+                <button id="paste-backup" class="btn-secondary">Paste Backup</button>
+            </div>
+            <div id="backup-status" class="status-message"></div>
+        </div>
+    </div>
+
+    <div id="paste-modal" class="modal">
+        <div class="modal-content">
+            <h2>Paste Backup Data</h2>
+            <textarea id="backup-input" placeholder="Paste your backup data here..."></textarea>
+            <div class="modal-buttons">
+                <button id="restore-btn" class="btn-primary">Restore</button>
+                <button id="cancel-btn" class="btn-secondary">Cancel</button>
+            </div>
+            <div id="paste-error" class="error-message"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
