@@ -29,6 +29,17 @@ class CalorieTracker {
         this.initChart();
         this.updateSettingsForm();
         this.updateBMRDisplay();
+        this.checkWebShareSupport();
+    }
+
+    // Check if Web Share API is supported (iOS Safari, Android Chrome, etc.)
+    checkWebShareSupport() {
+        if (navigator.share) {
+            const shareBtn = document.getElementById('shareDataBtn');
+            if (shareBtn) {
+                shareBtn.style.display = 'block';
+            }
+        }
     }
 
     // ========================================================================
@@ -576,6 +587,14 @@ class CalorieTracker {
             });
         });
 
+        // Share backup (iOS/Android native share sheet)
+        const shareBtn = document.getElementById('shareDataBtn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                this.shareData();
+            });
+        }
+
         // Export data (download)
         document.getElementById('exportDataBtn').addEventListener('click', () => {
             this.exportData();
@@ -658,6 +677,42 @@ class CalorieTracker {
         URL.revokeObjectURL(url);
 
         alert('Backup downloaded successfully! Save this file in a safe place.');
+    }
+
+    async shareData() {
+        try {
+            const data = this.getBackupData();
+            const jsonString = JSON.stringify(data, null, 2);
+            const fileName = `calorie-tracker-backup-${this.getTodayDate()}.json`;
+
+            // Try sharing as a file first (better for iOS Notes)
+            if (navigator.canShare) {
+                const file = new File([jsonString], fileName, { type: 'application/json' });
+
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Calorie Tracker Backup',
+                        text: `Backup from ${this.formatDate(this.getTodayDate())}`
+                    });
+                    return;
+                }
+            }
+
+            // Fallback to sharing text (still works with Notes app)
+            await navigator.share({
+                title: 'Calorie Tracker Backup',
+                text: `Calorie Tracker Backup - ${this.formatDate(this.getTodayDate())}\n\n${jsonString}`
+            });
+
+        } catch (err) {
+            // User cancelled or share failed
+            if (err.name !== 'AbortError') {
+                console.error('Share failed:', err);
+                // Fallback to copy
+                this.copyDataToClipboard();
+            }
+        }
     }
 
     async copyDataToClipboard() {

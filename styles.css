@@ -631,6 +631,18 @@ select:focus {
     min-width: 140px;
 }
 
+#shareDataBtn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border: none;
+    font-weight: 700;
+    box-shadow: var(--shadow);
+}
+
+#shareDataBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
 /* Utility Classes */
 .hidden {
     display: none !important;
