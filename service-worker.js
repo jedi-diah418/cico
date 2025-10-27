@@ -1,7 +1,7 @@
 // Service Worker for Offline Functionality
-// Version: 1.1.1
+// Version: 1.2.0
 
-const CACHE_VERSION = 'calorie-tracker-v1.1.1';
+const CACHE_VERSION = 'calorie-tracker-v1.2.0';
 const CACHE_NAME = `calorie-tracker-${CACHE_VERSION}`;
 
 // Files to cache for offline use
@@ -58,54 +58,78 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - use network-first strategy for app files, cache-first for external resources
 self.addEventListener('fetch', (event) => {
     // Skip non-GET requests
     if (event.request.method !== 'GET') {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request)
-            .then((cachedResponse) => {
-                if (cachedResponse) {
-                    console.log('[Service Worker] Serving from cache:', event.request.url);
-                    return cachedResponse;
-                }
+    const url = new URL(event.request.url);
+    const isAppFile = url.origin === self.location.origin &&
+                      (url.pathname.endsWith('.js') ||
+                       url.pathname.endsWith('.html') ||
+                       url.pathname.endsWith('.css'));
 
-                // Not in cache, fetch from network
-                console.log('[Service Worker] Fetching from network:', event.request.url);
-                return fetch(event.request)
-                    .then((response) => {
-                        // Don't cache non-successful responses
-                        if (!response || response.status !== 200 || response.type === 'error') {
-                            return response;
-                        }
-
-                        // Clone the response
+    if (isAppFile) {
+        // Network-first strategy for app files - always try to get fresh version
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    if (response && response.status === 200) {
+                        console.log('[Service Worker] Fetched fresh from network:', event.request.url);
                         const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                        });
+                        return response;
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    // Network failed, try cache
+                    console.log('[Service Worker] Network failed, serving from cache:', event.request.url);
+                    return caches.match(event.request);
+                })
+        );
+    } else {
+        // Cache-first strategy for external resources (like Chart.js from CDN)
+        event.respondWith(
+            caches.match(event.request)
+                .then((cachedResponse) => {
+                    if (cachedResponse) {
+                        console.log('[Service Worker] Serving from cache:', event.request.url);
+                        return cachedResponse;
+                    }
 
-                        // Cache the fetched resource
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
+                    // Not in cache, fetch from network
+                    console.log('[Service Worker] Fetching from network:', event.request.url);
+                    return fetch(event.request)
+                        .then((response) => {
+                            if (!response || response.status !== 200 || response.type === 'error') {
+                                return response;
+                            }
+
+                            const responseToCache = response.clone();
+                            caches.open(CACHE_NAME).then((cache) => {
                                 cache.put(event.request, responseToCache);
                             });
 
-                        return response;
-                    })
-                    .catch((error) => {
-                        console.error('[Service Worker] Fetch failed:', error);
-                        // Return offline page or error response
-                        return new Response('Offline - Resource not available', {
-                            status: 503,
-                            statusText: 'Service Unavailable',
-                            headers: new Headers({
-                                'Content-Type': 'text/plain'
-                            })
+                            return response;
+                        })
+                        .catch((error) => {
+                            console.error('[Service Worker] Fetch failed:', error);
+                            return new Response('Offline - Resource not available', {
+                                status: 503,
+                                statusText: 'Service Unavailable',
+                                headers: new Headers({
+                                    'Content-Type': 'text/plain'
+                                })
+                            });
                         });
-                    });
-            })
-    );
+                })
+        );
+    }
 });
 
 // Message event - handle update requests
