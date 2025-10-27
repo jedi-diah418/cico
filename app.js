@@ -657,7 +657,7 @@ class CalorieTracker {
 
     getBackupData() {
         return {
-            version: '1.0',
+            version: '1.1',
             userProfile: this.userProfile,
             quickAddItems: this.quickAddItems,
             dailyHistory: this.dailyHistory,
@@ -878,7 +878,7 @@ class PWAManager {
     constructor() {
         this.swRegistration = null;
         this.deferredPrompt = null;
-        this.appVersion = '1.0.0';
+        this.appVersion = '1.1.0';
 
         this.init();
     }

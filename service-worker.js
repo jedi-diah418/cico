@@ -1,7 +1,7 @@
 // Service Worker for Offline Functionality
-// Version: 1.0.0
+// Version: 1.1.0
 
-const CACHE_VERSION = 'calorie-tracker-v1.0.0';
+const CACHE_VERSION = 'calorie-tracker-v1.1.0';
 const CACHE_NAME = `calorie-tracker-${CACHE_VERSION}`;
 
 // Files to cache for offline use
