@@ -14,6 +14,10 @@ class CalorieTracker {
         this.chart = null;
         this.chartPeriod = 30;
 
+        console.log('=== Constructor ===');
+        console.log('Loaded entries:', this.todayEntries.length, 'entries');
+        console.log('Total calories loaded:', this.todayEntries.reduce((s, e) => s + e.calories, 0));
+
         this.init();
     }
 
@@ -65,15 +69,26 @@ class CalorieTracker {
         const today = this.getTodayDate();
         const lastDate = localStorage.getItem('lastActiveDate');
 
+        console.log('=== checkNewDay() ===');
+        console.log('Today:', today);
+        console.log('lastActiveDate:', lastDate);
+        console.log('Entries before check:', this.todayEntries.length, 'entries');
+
         if (lastDate && lastDate !== today) {
+            console.log('✓ New day detected! Archiving and resetting...');
             // New day detected - archive previous day
             this.archivePreviousDay(lastDate);
             this.todayEntries = [];
             this.saveTodayEntries();
+            console.log('✓ Entries cleared and saved');
+        } else {
+            console.log('✗ No reset - dates match or lastDate is null');
         }
 
         localStorage.setItem('lastActiveDate', today);
         this.currentDate = today;
+
+        console.log('Entries after check:', this.todayEntries.length, 'entries');
 
         // Update date display
         document.getElementById('currentDate').textContent = this.formatDate(today);
@@ -255,6 +270,12 @@ class CalorieTracker {
         const goal = this.userProfile.dailyGoal;
         const remaining = this.getRemainingCalories();
         const percentage = Math.min((total / goal) * 100, 100);
+
+        console.log('=== updateUI() ===');
+        console.log('Entries count:', this.todayEntries.length);
+        console.log('Total calories:', total);
+        console.log('Goal:', goal);
+        console.log('Remaining:', remaining);
 
         // Update stats
         document.getElementById('dailyGoal').textContent = goal;
