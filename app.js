@@ -626,6 +626,9 @@ class CalorieTracker {
         // Check for new day periodically (every minute)
         setInterval(() => {
             this.checkNewDay();
+            this.updateUI();
+            this.renderFoodLog();
+            this.renderHistory();
         }, 60000);
     }
 
